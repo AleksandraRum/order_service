@@ -1,0 +1,2 @@
+class InvalidQuantityError(Exception):
+    pass
