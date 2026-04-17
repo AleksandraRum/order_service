@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 from domain.models import Order
 from infrastructure.db.models import OrderDB
 
+from datetime import datetime, UTC
+from infrastructure.exceptions import OrderNotFoundError
+
 
 class OrderRepository:
     def __init__(self, session: Session):
@@ -50,7 +53,27 @@ class OrderRepository:
         self.session.commit()
         self.session.refresh(order_db)
 
+
         return self._to_domain(order_db)
+    
+    def update_status(self, order_id, status):
+      
+        order_db = (
+            self.session.query(OrderDB)
+            .filter(OrderDB.id == uuid.UUID(order_id))
+            .first()
+        )
+        if order_db is None:
+            raise OrderNotFoundError("Order isn't found")
+        
+        now = datetime.now(UTC)
+        order_db.status=status.value
+        order_db.updated_at=now
+        self.session.commit()
+        self.session.refresh(order_db)
+        
+        return self._to_domain(order_db)
+
 
     @staticmethod
     def _to_domain(order_db: OrderDB):

@@ -1,4 +1,10 @@
 from pydantic import BaseModel
+from enum import StrEnum
+
+
+class PaymentCallbackStatusEnum(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
 
 
 class CreateOrderDTO(BaseModel):
@@ -6,3 +12,10 @@ class CreateOrderDTO(BaseModel):
     quantity: int
     item_id: str
     idempotency_key: str
+
+
+class PaymentCallbackDTO(BaseModel):
+    order_id: str
+    status: PaymentCallbackStatusEnum
+
+

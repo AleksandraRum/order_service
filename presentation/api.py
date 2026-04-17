@@ -1,12 +1,12 @@
 import os
 from fastapi import  APIRouter, HTTPException
-from application.dto import CreateOrderDTO
-from infrastructure.clients import CatalogClient
+from application.dto import CreateOrderDTO, PaymentCallbackDTO
+from infrastructure.clients import CatalogClient, PaymentsClient
 from infrastructure.exceptions import OrderNotFoundError, ItemNotFoundError, NotEnoughStockError, CatalogServiceError
-from domain.exceptions import InvalidQuantityError
-from schemas.request import CreateOrderRequest
-from schemas.response import OrderResponse
-from application.use_cases import GetOrderUseCase, CreateOrderUseCase
+from domain.exceptions import InvalidQuantityError, PaymentCreationError
+from presentation.schemas.request import CreateOrderRequest, PaymentCallbackRequest
+from presentation.schemas.response import OrderResponse
+from application.use_cases import GetOrderUseCase, CreateOrderUseCase, CallBackPaymentsUseCase
 from infrastructure.db.session import SessionLocal
 from infrastructure.repository import OrderRepository
 
@@ -25,7 +25,7 @@ async def get_order(order_id: str):
             user_id=res.user_id,
             quantity=res.quantity,
             item_id=res.item_id,
-            status=res.status,
+            status=res.status.value,
             created_at=res.created_at,
             updated_at=res.updated_at
         )
@@ -44,19 +44,21 @@ async def create_order(order: CreateOrderRequest):
                                quantity=order.quantity,
                                item_id=order.item_id,
                                idempotency_key=order.idempotency_key)
-    catalog = CatalogClient(catalog_url=os.environ["CATALOG_URL"],
+    catalog = CatalogClient(base_url=os.environ["BASE_URL"],
                             api_key=os.environ["API_KEY"],)
+    payments_client = PaymentsClient(base_url=os.environ["BASE_URL"],
+                                     api_key=os.environ["API_KEY"],)
     session = SessionLocal()
     try:
         repository = OrderRepository(session=session)
-        use_case = CreateOrderUseCase(catalog=catalog, repository=repository)
+        use_case = CreateOrderUseCase(catalog=catalog, repository=repository, payments_client=payments_client)
         res = use_case(order_dto)
         response = OrderResponse(
         id=res.id,
         user_id=res.user_id,
         quantity=res.quantity,
         item_id=res.item_id,
-        status=res.status,
+        status=res.status.value,
         created_at=res.created_at,
         updated_at=res.updated_at
         )
@@ -69,9 +71,28 @@ async def create_order(order: CreateOrderRequest):
         raise HTTPException(status_code=500, detail=str(e))
     except  InvalidQuantityError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except PaymentCreationError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
     finally:
         session.close()
+
+
+@router.post("/api/orders/payment-callback", status_code=200)
+async def payment_callback(callback: PaymentCallbackRequest):
+    payment_callback_dto = PaymentCallbackDTO(order_id=callback.order_id,
+                                              status=callback.status)
+    session = SessionLocal()
+    try:
+        repository = OrderRepository(session=session)
+        use_case = CallBackPaymentsUseCase(repository=repository)
+        use_case(payment_callback_dto)
+    except OrderNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    finally:
+        session.close()
+
+    return {"status": "ok"}
 
 
 @router.get("/ping")

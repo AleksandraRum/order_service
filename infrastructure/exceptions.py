@@ -12,3 +12,7 @@ class CatalogServiceError(Exception):
 
 class OrderNotFoundError(Exception):
     pass
+
+
+class PaymentServiceError(Exception):
+    pass
