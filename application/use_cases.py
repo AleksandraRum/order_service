@@ -5,6 +5,7 @@ from infrastructure.exceptions import NotEnoughStockError, OrderNotFoundError, P
 from datetime import datetime, UTC
 import os
 from decimal import Decimal
+from infrastructure.kafka.producer import send_event
 
 
 class CreateOrderUseCase:
@@ -78,17 +79,23 @@ class CallBackPaymentsUseCase:
             raise OrderNotFoundError("Order with that id doesn't exist")
         if order.status == OrderStatusEnum.NEW:
             if dto.status == PaymentCallbackStatusEnum.SUCCEEDED:
+                
                 updated_order = self.uow.orders.update_status(dto.order_id, OrderStatusEnum.PAID)
+                payload = {
+                    "event_type": "order.paid",
+                    "order_id": order.id,
+                    "item_id": order.item_id,
+                    "quantity": order.quantity,
+                    "idempotency_key": order.idempotency_key
+
+                }
                 self.uow.outbox.create(
                     event_type="order.paid",
-                    payload={
-                        "order_id": order.id,
-                        "item_id": order.item_id,
-                        "quantity": order.quantity,
-                        "idempotency_key": order.idempotency_key
-                    },
+                    payload=payload,
                 )
+    
                 self.uow.commit()
+                send_event("student_system-order.events", payload)
             elif dto.status == PaymentCallbackStatusEnum.FAILED:
                 updated_order = self.uow.orders.update_status(dto.order_id, OrderStatusEnum.CANCELLED)
                 self.uow.commit()
