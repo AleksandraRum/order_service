@@ -8,7 +8,7 @@ from presentation.schemas.request import CreateOrderRequest, PaymentCallbackRequ
 from presentation.schemas.response import OrderResponse
 from application.use_cases import GetOrderUseCase, CreateOrderUseCase, CallBackPaymentsUseCase
 from infrastructure.db.session import SessionLocal
-from infrastructure.repository import OrderRepository
+from infrastructure.unit_of_work import UnitOfWork
 
 router = APIRouter()
 
@@ -17,8 +17,8 @@ async def get_order(order_id: str):
     session = SessionLocal()
 
     try:
-        repository = OrderRepository(session=session)
-        use_case = GetOrderUseCase(repository=repository)
+        uow = UnitOfWork(session)
+        use_case = GetOrderUseCase(uow=uow)
         res = use_case(order_id)
         response = OrderResponse(
             id=res.id,
@@ -50,8 +50,8 @@ async def create_order(order: CreateOrderRequest):
                                      api_key=os.environ["API_KEY"],)
     session = SessionLocal()
     try:
-        repository = OrderRepository(session=session)
-        use_case = CreateOrderUseCase(catalog=catalog, repository=repository, payments_client=payments_client)
+        uow = UnitOfWork(session)
+        use_case = CreateOrderUseCase(catalog=catalog, uow=uow, payments_client=payments_client)
         res = use_case(order_dto)
         response = OrderResponse(
         id=res.id,
@@ -84,8 +84,8 @@ async def payment_callback(callback: PaymentCallbackRequest):
                                               status=callback.status)
     session = SessionLocal()
     try:
-        repository = OrderRepository(session=session)
-        use_case = CallBackPaymentsUseCase(repository=repository)
+        uow = UnitOfWork(session)
+        use_case = CallBackPaymentsUseCase(uow=uow)
         use_case(payment_callback_dto)
     except OrderNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

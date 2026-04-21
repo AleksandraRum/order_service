@@ -16,3 +16,7 @@ class OrderNotFoundError(Exception):
 
 class PaymentServiceError(Exception):
     pass
+
+
+class UnknownTypeEvent(Exception):
+    pass
