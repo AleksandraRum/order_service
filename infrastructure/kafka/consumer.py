@@ -4,8 +4,12 @@ import os
 
 
 def run_consumer():
+    bootstrap_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
+    if not bootstrap_servers:
+        print("KAFKA_BOOTSTRAP_SERVERS is not set, consumer will not start")
+        return
     conf = {
-        "bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"],
+        "bootstrap.servers": bootstrap_servers,
         "group.id": "order-service-group",
         "auto.offset.reset": "earliest",
     }
