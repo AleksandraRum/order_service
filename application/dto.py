@@ -29,7 +29,7 @@ class ShipmentEventDTO(BaseModel):
     order_id: str
     item_id:str
     quantity: int
-    shipment_id: str | None
-    reason: str | None
+    shipment_id: str | None = None
+    reason: str | None = None
 
 
