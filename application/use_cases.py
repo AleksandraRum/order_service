@@ -108,6 +108,7 @@ class ShipmentEventUseCase:
         self.uow = uow
 
     def __call__ (self, dto: ShipmentEventDTO):
+        print("SHIPMENT USE CASE STARTED:", dto)
         event_type = dto.event_type.value
         order_id = dto.order_id
         payload = {
@@ -126,10 +127,13 @@ class ShipmentEventUseCase:
             raise OrderNotFoundError("Order with that id doesn't exist")
         
         if event_type == ShipmentEventTypeEnum.SHIPPED.value:
+            print("UPDATING ORDER STATUS TO SHIPPED:", order_id)
             updated_order = self.uow.orders.update_status(order_id, OrderStatusEnum.SHIPPED)
+            print("UPDATING ORDER STATUS TO CANCELLED:", order_id)
         elif event_type == ShipmentEventTypeEnum.CANCELLED.value:
             updated_order = self.uow.orders.update_status(order_id, OrderStatusEnum.CANCELLED)
         else:
             return None
         self.uow.commit()
+        print("ORDER STATUS UPDATED:", updated_order.status)
         return updated_order

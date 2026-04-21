@@ -10,12 +10,13 @@ def run_consumer():
         return
     conf = {
         "bootstrap.servers": bootstrap_servers,
-        "group.id": "order-service-group",
+        "group.id": "order-service-group-v2",
         "auto.offset.reset": "earliest",
     }
 
     consumer = Consumer(conf)
     consumer.subscribe(["student_system-shipment.events"])
+    print("Kafka subscribed to student_system-shipment.events")
 
     print("Kafka consumer started")
 
@@ -30,6 +31,7 @@ def run_consumer():
                 print("Kafka error:", msg.error())
                 continue
 
+            print("KAFKA MESSAGE RECEIVED:", msg.value())
             handle_message(msg.value())
 
     finally:
