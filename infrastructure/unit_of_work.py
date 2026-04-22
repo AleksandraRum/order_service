@@ -5,7 +5,7 @@ class UnitOfWork:
         self.session = session
         self.orders = OrderRepository(session)
         self.outbox = OutboxRepository(session)
-        self.inbox = InboxRepository
+        self.inbox = InboxRepository(session)
 
     def commit(self):
         self.session.commit()
