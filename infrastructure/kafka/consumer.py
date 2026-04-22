@@ -6,7 +6,7 @@ import os
 def run_consumer():
     bootstrap_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
     if not bootstrap_servers:
-        print("KAFKA_BOOTSTRAP_SERVERS is not set, consumer will not start")
+        print("KAFKA_BOOTSTRAP_SERVERS is not set, consumer will not start", flush=True)
         return
     conf = {
         "bootstrap.servers": bootstrap_servers,
@@ -16,9 +16,9 @@ def run_consumer():
 
     consumer = Consumer(conf)
     consumer.subscribe(["student_system-shipment.events"])
-    print("Kafka subscribed to student_system-shipment.events")
+    print("Kafka subscribed to student_system-shipment.events", flush=True)
 
-    print("Kafka consumer started")
+    print("Kafka consumer started", flush=True)
 
     try:
         while True:
@@ -28,10 +28,10 @@ def run_consumer():
                 continue
 
             if msg.error():
-                print("Kafka error:", msg.error())
+                print("Kafka error:", msg.error(), flush=True)
                 continue
 
-            print("KAFKA MESSAGE RECEIVED:", msg.value())
+            print("KAFKA MESSAGE RECEIVED:", msg.value(), flush=True)
             handle_message(msg.value())
 
     finally:

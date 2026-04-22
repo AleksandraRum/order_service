@@ -9,17 +9,17 @@ from infrastructure.exceptions import OrderNotFoundError, UnknownTypeEvent
 
 def handle_message(raw_message):
     try:
-        print("RAW MESSAGE:", raw_message)
+        print("RAW MESSAGE:", raw_message, flush=True)
         data = json.loads(raw_message.decode("utf-8"))
-        print("PARSED DATA:", data)
+        print("PARSED DATA:", data, flush=True)
         dto = ShipmentEventDTO(**data)
-        print("DTO CREATED:", dto)
+        print("DTO CREATED:", dto, flush=True)
     except json.JSONDecodeError:
-        print("Invalid JSON:", raw_message)
+        print("Invalid JSON:", raw_message, flush=True)
         return
     except ValidationError as e:
-        print("Invalid DTO:", e)
-        print("BAD DATA:", data)
+        print("Invalid DTO:", flush=True)
+        print("BAD DATA:", data, flush=True)
         return
     
     session = SessionLocal()
@@ -28,12 +28,12 @@ def handle_message(raw_message):
         use_case = ShipmentEventUseCase(uow=uow)
         use_case(dto)
     except OrderNotFoundError:
-        print(f"Order not found: {dto.order_id}")
+        print(f"Order not found: {dto.order_id}", flush=True)
     except UnknownTypeEvent:
-        print(f"Unknown event type: {dto.event_type}")
+        print(f"Unknown event type: {dto.event_type}", flush=True)
     except Exception as e:
-        print("Unexpected error:", e)
-        print("HANDLE MESSAGE ERROR:", e)
+        print("Unexpected error:", e, flush=True)
+        print("HANDLE MESSAGE ERROR:", e, flush=True)
     finally:
         session.close()
 
