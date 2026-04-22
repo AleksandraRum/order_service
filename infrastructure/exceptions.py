@@ -20,3 +20,7 @@ class PaymentServiceError(Exception):
 
 class UnknownTypeEvent(Exception):
     pass
+
+
+class NotificationServiceError(Exception):
+    pass

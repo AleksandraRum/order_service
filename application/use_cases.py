@@ -1,7 +1,7 @@
 from application.dto import CreateOrderDTO, PaymentCallbackDTO, PaymentCallbackStatusEnum, ShipmentEventDTO, ShipmentEventTypeEnum
 from domain.models import Order, OrderStatusEnum
 from domain.exceptions import PaymentCreationError
-from infrastructure.exceptions import NotEnoughStockError, OrderNotFoundError, PaymentServiceError
+from infrastructure.exceptions import NotEnoughStockError, OrderNotFoundError, PaymentServiceError, NotificationServiceError
 from datetime import datetime, UTC
 import os
 from decimal import Decimal
@@ -9,10 +9,11 @@ from infrastructure.kafka.producer import send_event
 
 
 class CreateOrderUseCase:
-    def __init__(self, catalog, uow, payments_client):
+    def __init__(self, catalog, uow, payments_client, notification_client):
         self.catalog = catalog
         self.uow = uow
         self.payments_client = payments_client
+        self.notification_client = notification_client
 
 
     def __call__(self, dto: CreateOrderDTO):
@@ -35,10 +36,21 @@ class CreateOrderUseCase:
         )
         saved_order = self.uow.orders.save(domain_order)
         self.uow.commit()
+        order_id = saved_order.id
+        
+        message = "Ваш заказ создан и ожидает оплаты"
+        idempotency_key_notification = f"Notification:{order_id}:new"
+        try:
+            self.notification_client.send_notification(message=message, 
+                                                  reference_id=order_id, 
+                                                  idempotency_key=idempotency_key_notification
+            )
+        except NotificationServiceError:
+            print("Notification service is unavailable. Message about new order wasn't sent.")
+        idempotency_key = saved_order.idempotency_key
         callback_url_base = os.environ["CALLBACK_URL"]
         callback_url = f"{callback_url_base}/api/orders/payment-callback"
-        order_id = saved_order.id
-        idempotency_key = saved_order.idempotency_key
+        
         amount = Decimal(item_in_catalog["price"]) * saved_order.quantity
         
         try:
@@ -52,6 +64,15 @@ class CreateOrderUseCase:
         except PaymentServiceError:
             saved_order = self.uow.orders.update_status(order_id, OrderStatusEnum.CANCELLED)
             self.uow.commit()
+            message = "Ваш заказ отменен. Причина: Payment failed"
+            idempotency_key_notification = f"Notification:{order_id}:cancelled"
+            try:
+                self.notification_client.send_notification(message=message, 
+                                                           reference_id=order_id, 
+                                                           idempotency_key=idempotency_key_notification
+                )
+            except NotificationServiceError:
+                print("Notification service is unavailable. Message about cancelled order wasn't sent.")
             raise PaymentCreationError("Payment has failed")
     
         return saved_order
@@ -61,6 +82,7 @@ class CreateOrderUseCase:
 class GetOrderUseCase:
     def __init__(self, uow):
         self.uow = uow
+
     
     def __call__(self, order_id):
         order = self.uow.orders.get_by_id(order_id)
@@ -70,8 +92,9 @@ class GetOrderUseCase:
     
 
 class CallBackPaymentsUseCase:
-    def __init__(self, uow):
+    def __init__(self, uow, notification_client):
         self.uow = uow
+        self.notification_client = notification_client
 
     def __call__(self, dto: PaymentCallbackDTO):
         order = self.uow.orders.get_by_id(dto.order_id)
@@ -95,20 +118,39 @@ class CallBackPaymentsUseCase:
                 )
     
                 self.uow.commit()
+                message = "Ваш заказ успешно оплачен и готов к отправке"
+                idempotency_key_notification = f"Notification:{updated_order.id}:paid"
+                try:
+                     self.notification_client.send_notification(message=message, 
+                                                                reference_id=updated_order.id, 
+                                                                idempotency_key=idempotency_key_notification
+                )
+                except NotificationServiceError:
+                    print("Notification service is unavailable. Message about payment wasn't sent.")
                 send_event("student_system-order.events", payload)
+
             elif dto.status == PaymentCallbackStatusEnum.FAILED:
                 updated_order = self.uow.orders.update_status(dto.order_id, OrderStatusEnum.CANCELLED)
                 self.uow.commit()
+                message = "Ваш заказ отменен. Причина: Payment failed"
+                idempotency_key_notification = f"Notification:{updated_order.id}:cancelled"
+                try:
+                     self.notification_client.send_notification(message=message, 
+                                                                reference_id=updated_order.id, 
+                                                                idempotency_key=idempotency_key_notification
+                )
+                except NotificationServiceError:
+                    print("Notification service is unavailable. Message about cancelled order wasn't sent.")
             return updated_order
         return order
     
 
 class ShipmentEventUseCase:
-    def __init__(self, uow):
+    def __init__(self, uow, notification_client):
         self.uow = uow
+        self.notification_client = notification_client
 
     def __call__ (self, dto: ShipmentEventDTO):
-        print("SHIPMENT USE CASE STARTED:", dto, flush=True)
         event_type = dto.event_type.value
         order_id = dto.order_id
         payload = {
@@ -127,13 +169,30 @@ class ShipmentEventUseCase:
             raise OrderNotFoundError("Order with that id doesn't exist")
         
         if event_type == ShipmentEventTypeEnum.SHIPPED.value:
-            print("UPDATING ORDER STATUS TO SHIPPED:", order_id, flush=True)
             updated_order = self.uow.orders.update_status(order_id, OrderStatusEnum.SHIPPED)
-            print("UPDATING ORDER STATUS TO CANCELLED:", order_id, flush=True)
+            self.uow.commit()
+            message = "Ваш заказ отправлен в доставку"
+            idempotency_key_notification = f"Notification:{updated_order.id}:shipped"
+            try:
+                self.notification_client.send_notification(message=message, 
+                                                           reference_id=updated_order.id, 
+                                                           idempotency_key=idempotency_key_notification
+                )
+            except NotificationServiceError:
+                print("Notification service is unavailable. Message about shipping order wasn't sent.")
         elif event_type == ShipmentEventTypeEnum.CANCELLED.value:
             updated_order = self.uow.orders.update_status(order_id, OrderStatusEnum.CANCELLED)
+            self.uow.commit()
+            message = f"Ваш заказ отменен. Причина: {dto.reason}"
+            idempotency_key_notification = f"Notification:{updated_order.id}:cancelled"
+            try:
+                self.notification_client.send_notification(message=message, 
+                                                           reference_id=updated_order.id, 
+                                                           idempotency_key=idempotency_key_notification
+                )
+            except NotificationServiceError:
+                print("Notification service is unavailable. Message about cancelled order wasn't sent.")
         else:
             return None
-        self.uow.commit()
-        print("ORDER STATUS UPDATED:", updated_order.status, flush=True)
+        
         return updated_order

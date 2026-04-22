@@ -1,5 +1,5 @@
 import httpx
-from infrastructure.exceptions import ItemNotFoundError, CatalogServiceError, PaymentServiceError
+from infrastructure.exceptions import ItemNotFoundError, CatalogServiceError, PaymentServiceError,  NotificationServiceError
 
 
 class CatalogClient:
@@ -43,7 +43,8 @@ class PaymentsClient:
                     "amount": str(amount),
                     "callback_url": callback_url,
                     "idempotency_key": idempotency_key
-                }
+                },
+                timeout=5.0
             )
         except httpx.RequestError:
             raise PaymentServiceError("Payment service is unavailable")
@@ -55,5 +56,30 @@ class PaymentsClient:
         
         return response.json()
 
+
+class NotificationServiceClient:
+    def __init__(self, api_key, base_url):
+        self.api_key = api_key
+        self.base_url = base_url
+
+    def send_notification(self, message, reference_id, idempotency_key):
+        try:
+            response = httpx.post(
+                f"{self.base_url}/api/notifications",
+                headers={"X-API-Key": self.api_key},
+                json={
+                    "message": message,
+                    "reference_id": reference_id,
+                    "idempotency_key": idempotency_key
+                },
+                timeout=5.0
+            )
+        except httpx.RequestError:
+            raise NotificationServiceError("Notification service is unavailable")
+        if response.status_code >= 400:
+
+            raise NotificationServiceError(f"Notification failed: {response.status_code}")
+        
+        return response.json()
         
     
