@@ -38,7 +38,7 @@ class CreateOrderUseCase:
         self.uow.commit()
         order_id = saved_order.id
         
-        message = "Ваш заказ создан и ожидает оплаты"
+        message = "NEW: Ваш заказ создан и ожидает оплаты"
         idempotency_key_notification = f"Notification:{order_id}:new"
         try:
             self.notification_client.send_notification(message=message, 
@@ -64,7 +64,7 @@ class CreateOrderUseCase:
         except PaymentServiceError:
             saved_order = self.uow.orders.update_status(order_id, OrderStatusEnum.CANCELLED)
             self.uow.commit()
-            message = "Ваш заказ отменен. Причина: Payment failed"
+            message = "CANCELLED: Ваш заказ отменен. Причина: Payment failed"
             idempotency_key_notification = f"Notification:{order_id}:cancelled"
             try:
                 self.notification_client.send_notification(message=message, 
@@ -118,7 +118,7 @@ class CallBackPaymentsUseCase:
                 )
     
                 self.uow.commit()
-                message = "Ваш заказ успешно оплачен и готов к отправке"
+                message = "PAID: Ваш заказ успешно оплачен и готов к отправке"
                 idempotency_key_notification = f"Notification:{updated_order.id}:paid"
                 try:
                      self.notification_client.send_notification(message=message, 
@@ -132,7 +132,7 @@ class CallBackPaymentsUseCase:
             elif dto.status == PaymentCallbackStatusEnum.FAILED:
                 updated_order = self.uow.orders.update_status(dto.order_id, OrderStatusEnum.CANCELLED)
                 self.uow.commit()
-                message = "Ваш заказ отменен. Причина: Payment failed"
+                message = "CANCELLED: Ваш заказ отменен. Причина: Payment failed"
                 idempotency_key_notification = f"Notification:{updated_order.id}:cancelled"
                 try:
                      self.notification_client.send_notification(message=message, 
@@ -171,7 +171,7 @@ class ShipmentEventUseCase:
         if event_type == ShipmentEventTypeEnum.SHIPPED.value:
             updated_order = self.uow.orders.update_status(order_id, OrderStatusEnum.SHIPPED)
             self.uow.commit()
-            message = "Ваш заказ отправлен в доставку"
+            message = "SHIPPED: Ваш заказ отправлен в доставку"
             idempotency_key_notification = f"Notification:{updated_order.id}:shipped"
             try:
                 self.notification_client.send_notification(message=message, 
@@ -183,7 +183,7 @@ class ShipmentEventUseCase:
         elif event_type == ShipmentEventTypeEnum.CANCELLED.value:
             updated_order = self.uow.orders.update_status(order_id, OrderStatusEnum.CANCELLED)
             self.uow.commit()
-            message = f"Ваш заказ отменен. Причина: {dto.reason}"
+            message = f"CANCELLED: Ваш заказ отменен. Причина: {dto.reason}"
             idempotency_key_notification = f"Notification:{updated_order.id}:cancelled"
             try:
                 self.notification_client.send_notification(message=message, 
