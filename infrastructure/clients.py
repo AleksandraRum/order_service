@@ -1,4 +1,5 @@
 import httpx
+import time
 from infrastructure.exceptions import ItemNotFoundError, CatalogServiceError, PaymentServiceError,  NotificationServiceError
 
 
@@ -63,8 +64,14 @@ class NotificationServiceClient:
         self.base_url = base_url
 
     def send_notification(self, message, reference_id, idempotency_key):
-        try:
-            response = httpx.post(
+        delays = [0.0, 0.5, 1.0]
+
+        for attempt, delay in enumerate(delays, start=1):
+
+            if delay > 0:
+                time.sleep(delay)
+            try:
+                response = httpx.post(
                 f"{self.base_url}/api/notifications",
                 headers={"X-API-Key": self.api_key},
                 json={
@@ -73,13 +80,21 @@ class NotificationServiceClient:
                     "idempotency_key": idempotency_key
                 },
                 timeout=5.0
+                )
+            except httpx.RequestError:
+                if attempt == len(delays):
+                    raise NotificationServiceError("Notification service is unavailable")
+                continue
+            if response.status_code in (200, 201):
+                return response.json()
+            if response.status_code >= 500:
+                if attempt == len(delays):
+                    raise NotificationServiceError(
+                        f"Notification failed: {response.status_code}"
+                    )
+                continue
+            raise NotificationServiceError(
+                f"Notification failed: {response.status_code}"
             )
-        except httpx.RequestError:
-            raise NotificationServiceError("Notification service is unavailable")
-        if response.status_code >= 400:
-
-            raise NotificationServiceError(f"Notification failed: {response.status_code}")
-        
-        return response.json()
         
     
