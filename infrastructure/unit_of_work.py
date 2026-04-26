@@ -1,4 +1,5 @@
-from infrastructure.repository import OrderRepository, OutboxRepository, InboxRepository
+from infrastructure.repository import InboxRepository, OrderRepository, OutboxRepository
+
 
 class UnitOfWork:
     def __init__(self, session):

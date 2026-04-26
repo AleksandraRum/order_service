@@ -1,10 +1,12 @@
-from sqlalchemy import Column, String, Integer, DateTime, JSON, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import declarative_base
 import uuid
 from enum import StrEnum
 
+from sqlalchemy import JSON, Column, DateTime, Integer, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import declarative_base
+
 Base = declarative_base()
+
 
 class OutboxStatusEnum(StrEnum):
     PENDING = "pending"
@@ -24,9 +26,8 @@ class OrderDB(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
 
-
 class OutboxDB(Base):
-    __tablename__="outbox"
+    __tablename__ = "outbox"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     event_type = Column(String, nullable=False)
     payload = Column(JSON, nullable=False)

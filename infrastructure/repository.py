@@ -1,14 +1,12 @@
 import uuid
+from datetime import UTC, datetime
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from domain.models import Order
-from infrastructure.db.models import OrderDB, OutboxDB, OutboxStatusEnum, InboxDB
-
-from datetime import datetime, UTC
+from infrastructure.db.models import InboxDB, OrderDB, OutboxDB, OutboxStatusEnum
 from infrastructure.exceptions import OrderNotFoundError
-
-from sqlalchemy.exc import IntegrityError
 
 
 class OrderRepository:
@@ -17,9 +15,7 @@ class OrderRepository:
 
     def get_by_idempotency_key(self, key: str):
         order_db = (
-            self.session.query(OrderDB)
-            .filter(OrderDB.idempotency_key == key)
-            .first()
+            self.session.query(OrderDB).filter(OrderDB.idempotency_key == key).first()
         )
 
         if order_db is None:
@@ -55,9 +51,9 @@ class OrderRepository:
         self.session.flush()
 
         return self._to_domain(order_db)
-    
+
     def update_status(self, order_id, status):
-      
+
         order_db = (
             self.session.query(OrderDB)
             .filter(OrderDB.id == uuid.UUID(order_id))
@@ -65,16 +61,14 @@ class OrderRepository:
         )
         if order_db is None:
             raise OrderNotFoundError("Order isn't found")
-        
+
         now = datetime.now(UTC)
-        order_db.status=status.value
-        order_db.updated_at=now
+        order_db.status = status.value
+        order_db.updated_at = now
 
         return self._to_domain(order_db)
 
-
-    @staticmethod
-    def _to_domain(order_db: OrderDB):
+    def _to_domain(self, order_db: OrderDB):
         return Order(
             id=str(order_db.id),
             user_id=order_db.user_id,
@@ -85,7 +79,7 @@ class OrderRepository:
             created_at=order_db.created_at,
             updated_at=order_db.updated_at,
         )
-    
+
 
 class OutboxRepository:
     def __init__(self, session: Session):
@@ -105,7 +99,7 @@ class InboxRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def try_create(self, event_type:str, order_id: str, payload: dict):
+    def try_create(self, event_type: str, order_id: str, payload: dict):
         try:
             event_inbox = InboxDB(
                 event_type=event_type,
@@ -119,7 +113,3 @@ class InboxRepository:
         except IntegrityError:
             self.session.rollback()
             return False
-        
-
-
-    

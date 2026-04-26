@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from enum import StrEnum
+
+from pydantic import BaseModel
 
 
 class PaymentCallbackStatusEnum(StrEnum):
@@ -27,9 +28,7 @@ class PaymentCallbackDTO(BaseModel):
 class ShipmentEventDTO(BaseModel):
     event_type: ShipmentEventTypeEnum
     order_id: str
-    item_id:str
+    item_id: str
     quantity: int
     shipment_id: str | None = None
     reason: str | None = None
-
-

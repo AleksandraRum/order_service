@@ -1,7 +1,7 @@
 import pytest
 
-from domain.models import OrderStatusEnum
 from domain.exceptions import InvalidQuantityError
+from domain.models import OrderStatusEnum
 
 
 def test_order_is_created_with_valid_data(order_factory):

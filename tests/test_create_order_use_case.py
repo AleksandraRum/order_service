@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from application.dto import CreateOrderDTO
 from application.use_cases import CreateOrderUseCase
@@ -41,10 +42,7 @@ def test_create_order_raises_error_when_not_enough_stock():
     repository.get_by_idempotency_key.return_value = None
 
     catalog = MagicMock()
-    catalog.get_item.return_value = {
-        "available_qty": 1,
-        "price": "100.00"
-    }
+    catalog.get_item.return_value = {"available_qty": 1, "price": "100.00"}
 
     payments_client = MagicMock()
 
@@ -81,7 +79,7 @@ def test_create_order_successful_case(order_factory, monkeypatch):
         "name": "Product Name",
         "price": "100.00",
         "available_qty": 10,
-        "created_at": "2024-01-01T00:00:00Z"
+        "created_at": "2024-01-01T00:00:00Z",
     }
 
     payments_client = MagicMock()
@@ -104,5 +102,3 @@ def test_create_order_successful_case(order_factory, monkeypatch):
     assert result == saved_order
     repository.save.assert_called_once()
     payments_client.create_payment.assert_called_once()
-    
-

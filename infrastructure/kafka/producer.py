@@ -1,17 +1,17 @@
-from confluent_kafka import Producer
-import os
 import json
+
+from confluent_kafka import Producer
+
+from infrastructure.config import settings
 
 
 def get_producer():
-    bootstrap = os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
+    bootstrap = settings.KAFKA_BOOTSTRAP_SERVERS
     if not bootstrap:
         print("Kafka not configured")
         return None
 
-    return Producer({
-        "bootstrap.servers": bootstrap
-    })
+    return Producer({"bootstrap.servers": bootstrap})
 
 
 def send_event(topic: str, payload: dict):
@@ -19,8 +19,5 @@ def send_event(topic: str, payload: dict):
     if not producer:
         return
 
-    producer.produce(
-        topic=topic,
-        value=json.dumps(payload).encode("utf-8")
-    )
+    producer.produce(topic=topic, value=json.dumps(payload).encode("utf-8"))
     producer.flush()

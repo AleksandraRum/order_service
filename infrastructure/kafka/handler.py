@@ -1,12 +1,14 @@
 import json
-import os
-from infrastructure.unit_of_work import UnitOfWork
-from application.dto import ShipmentEventDTO
-from infrastructure.db.session import SessionLocal
-from application.use_cases import ShipmentEventUseCase
+
 from pydantic import ValidationError
-from infrastructure.exceptions import OrderNotFoundError, UnknownTypeEvent
+
+from application.dto import ShipmentEventDTO
+from application.use_cases import ShipmentEventUseCase
 from infrastructure.clients import NotificationServiceClient
+from infrastructure.config import settings
+from infrastructure.db.session import SessionLocal
+from infrastructure.exceptions import OrderNotFoundError, UnknownTypeEvent
+from infrastructure.unit_of_work import UnitOfWork
 
 
 def handle_message(raw_message):
@@ -19,13 +21,17 @@ def handle_message(raw_message):
     except ValidationError as e:
         print("Invalid DTO:", e)
         return
-    
+
     session = SessionLocal()
     try:
         uow = UnitOfWork(session)
-        notification_client = NotificationServiceClient(base_url=os.environ["BASE_URL"],
-                                                        api_key=os.environ["API_KEY"],)
-        use_case = ShipmentEventUseCase(uow=uow, notification_client=notification_client)
+        notification_client = NotificationServiceClient(
+            base_url=settings.BASE_URL,
+            api_key=settings.API_KEY,
+        )
+        use_case = ShipmentEventUseCase(
+            uow=uow, notification_client=notification_client
+        )
         use_case(dto)
     except OrderNotFoundError:
         print(f"Order not found: {dto.order_id}")
@@ -35,6 +41,3 @@ def handle_message(raw_message):
         print("Unexpected error:", e)
     finally:
         session.close()
-
-        
-    

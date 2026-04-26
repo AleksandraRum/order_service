@@ -1,10 +1,11 @@
 from confluent_kafka import Consumer
+
+from infrastructure.config import settings
 from infrastructure.kafka.handler import handle_message
-import os
 
 
 def run_consumer():
-    bootstrap_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
+    bootstrap_servers = settings.KAFKA_BOOTSTRAP_SERVERS
     if not bootstrap_servers:
         print("KAFKA_BOOTSTRAP_SERVERS is not set, consumer will not start", flush=True)
         return

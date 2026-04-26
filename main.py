@@ -1,15 +1,16 @@
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
 import threading
+from contextlib import asynccontextmanager
 
-from presentation.api import router
+from fastapi import FastAPI
+
 from infrastructure.db.models import Base
 from infrastructure.db.session import engine
 from infrastructure.kafka.consumer import run_consumer
-
+from presentation.api import router
 
 Base.metadata.create_all(bind=engine)
 
