@@ -162,7 +162,7 @@ class CallBackPaymentsUseCase:
                     logger.warning(
                         "Notification service is unavailable. Message about payment wasn't sent."
                     )
-                send_event("student_system-order.events", payload)
+                await send_event("student_system-order.events", payload)
 
             elif dto.status == PaymentCallbackStatusEnum.FAILED:
                 updated_order = self.uow.orders.update_status(
