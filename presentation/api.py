@@ -53,7 +53,7 @@ def get_order(order_id: str):
 
 
 @router.post("/api/orders", response_model=OrderResponse, status_code=201)
-def create_order(
+async def create_order(
     order: CreateOrderRequest,
     catalog=Depends(get_catalog_client),
     payments_client=Depends(get_payments_client),
@@ -76,7 +76,7 @@ def create_order(
             notification_client=notification_client,
             callback_url=callback_url,
         )
-        res = use_case(order_dto)
+        res = await use_case(order_dto)
         response = OrderResponse(
             id=res.id,
             user_id=res.user_id,
@@ -103,7 +103,7 @@ def create_order(
 
 
 @router.post("/api/orders/payment-callback", status_code=200)
-def payment_callback(
+async def payment_callback(
     callback: PaymentCallbackRequest,
     notification_client=Depends(get_notification_client),
 ):
@@ -116,7 +116,7 @@ def payment_callback(
         use_case = CallBackPaymentsUseCase(
             uow=uow, notification_client=notification_client
         )
-        use_case(payment_callback_dto)
+        await use_case(payment_callback_dto)
     except OrderNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     finally:

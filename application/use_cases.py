@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -7,6 +8,12 @@ from application.dto import (
     PaymentCallbackStatusEnum,
     ShipmentEventDTO,
     ShipmentEventTypeEnum,
+)
+from application.ports import (
+    CatalogPort,
+    NotificationPort,
+    PaymentsPort,
+    UnitOfWorkPort,
 )
 from domain.exceptions import PaymentCreationError
 from domain.models import Order, OrderStatusEnum
@@ -18,10 +25,17 @@ from infrastructure.exceptions import (
 )
 from infrastructure.kafka.producer import send_event
 
+logger = logging.getLogger(__name__)
+
 
 class CreateOrderUseCase:
     def __init__(
-        self, catalog, uow, payments_client, notification_client, callback_url
+        self,
+        catalog: CatalogPort,
+        uow: UnitOfWorkPort,
+        payments_client: PaymentsPort,
+        notification_client: NotificationPort,
+        callback_url,
     ):
         self.catalog = catalog
         self.uow = uow
@@ -29,11 +43,11 @@ class CreateOrderUseCase:
         self.notification_client = notification_client
         self.callback_url = callback_url
 
-    def __call__(self, dto: CreateOrderDTO):
+    async def __call__(self, dto: CreateOrderDTO):
         existing_order = self.uow.orders.get_by_idempotency_key(dto.idempotency_key)
         if existing_order:
             return existing_order
-        item_in_catalog = self.catalog.get_item(dto.item_id)
+        item_in_catalog = await self.catalog.get_item(dto.item_id)
         if item_in_catalog["available_qty"] < dto.quantity:
             raise NotEnoughStockError("Not enough items in stock")
         now = datetime.now(UTC)
@@ -54,13 +68,13 @@ class CreateOrderUseCase:
         message = "NEW: Ваш заказ создан и ожидает оплаты"
         idempotency_key_notification = f"Notification:{order_id}:new"
         try:
-            self.notification_client.send_notification(
+            await self.notification_client.send_notification(
                 message=message,
                 reference_id=order_id,
                 idempotency_key=idempotency_key_notification,
             )
         except NotificationServiceError:
-            print(
+            logger.warning(
                 "Notification service is unavailable. Message about new order wasn't sent."
             )
         idempotency_key = saved_order.idempotency_key
@@ -69,7 +83,7 @@ class CreateOrderUseCase:
         amount = Decimal(item_in_catalog["price"]) * saved_order.quantity
 
         try:
-            self.payments_client.create_payment(
+            await self.payments_client.create_payment(
                 order_id=order_id,
                 amount=str(amount),
                 callback_url=callback_url,
@@ -84,13 +98,13 @@ class CreateOrderUseCase:
             message = "CANCELLED: Ваш заказ отменен. Причина: Payment failed"
             idempotency_key_notification = f"Notification:{order_id}:cancelled"
             try:
-                self.notification_client.send_notification(
+                await self.notification_client.send_notification(
                     message=message,
                     reference_id=order_id,
                     idempotency_key=idempotency_key_notification,
                 )
             except NotificationServiceError:
-                print(
+                logger.warning(
                     "Notification service is unavailable. Message about cancelled order wasn't sent."
                 )
             raise PaymentCreationError("Payment has failed")
@@ -99,7 +113,7 @@ class CreateOrderUseCase:
 
 
 class GetOrderUseCase:
-    def __init__(self, uow):
+    def __init__(self, uow: UnitOfWorkPort):
         self.uow = uow
 
     def __call__(self, order_id):
@@ -110,11 +124,11 @@ class GetOrderUseCase:
 
 
 class CallBackPaymentsUseCase:
-    def __init__(self, uow, notification_client):
+    def __init__(self, uow: UnitOfWorkPort, notification_client: NotificationPort):
         self.uow = uow
         self.notification_client = notification_client
 
-    def __call__(self, dto: PaymentCallbackDTO):
+    async def __call__(self, dto: PaymentCallbackDTO):
         order = self.uow.orders.get_by_id(dto.order_id)
         if not order:
             raise OrderNotFoundError("Order with that id doesn't exist")
@@ -139,13 +153,13 @@ class CallBackPaymentsUseCase:
                 message = "PAID: Ваш заказ успешно оплачен и готов к отправке"
                 idempotency_key_notification = f"Notification:{updated_order.id}:paid"
                 try:
-                    self.notification_client.send_notification(
+                    await self.notification_client.send_notification(
                         message=message,
                         reference_id=updated_order.id,
                         idempotency_key=idempotency_key_notification,
                     )
                 except NotificationServiceError:
-                    print(
+                    logger.warning(
                         "Notification service is unavailable. Message about payment wasn't sent."
                     )
                 send_event("student_system-order.events", payload)
@@ -160,13 +174,13 @@ class CallBackPaymentsUseCase:
                     f"Notification:{updated_order.id}:cancelled"
                 )
                 try:
-                    self.notification_client.send_notification(
+                    await self.notification_client.send_notification(
                         message=message,
                         reference_id=updated_order.id,
                         idempotency_key=idempotency_key_notification,
                     )
                 except NotificationServiceError:
-                    print(
+                    logger.warning(
                         "Notification service is unavailable. Message about cancelled order wasn't sent."
                     )
             return updated_order
@@ -174,11 +188,11 @@ class CallBackPaymentsUseCase:
 
 
 class ShipmentEventUseCase:
-    def __init__(self, uow, notification_client):
+    def __init__(self, uow: UnitOfWorkPort, notification_client: NotificationPort):
         self.uow = uow
         self.notification_client = notification_client
 
-    def __call__(self, dto: ShipmentEventDTO):
+    async def __call__(self, dto: ShipmentEventDTO):
         event_type = dto.event_type.value
         order_id = dto.order_id
         payload = {
@@ -206,13 +220,13 @@ class ShipmentEventUseCase:
             message = "SHIPPED: Ваш заказ отправлен в доставку"
             idempotency_key_notification = f"Notification:{updated_order.id}:shipped"
             try:
-                self.notification_client.send_notification(
+                await self.notification_client.send_notification(
                     message=message,
                     reference_id=updated_order.id,
                     idempotency_key=idempotency_key_notification,
                 )
             except NotificationServiceError:
-                print(
+                logger.warning(
                     "Notification service is unavailable. Message about shipping order wasn't sent."
                 )
         elif event_type == ShipmentEventTypeEnum.CANCELLED.value:
@@ -223,16 +237,17 @@ class ShipmentEventUseCase:
             message = f"CANCELLED: Ваш заказ отменен. Причина: {dto.reason}"
             idempotency_key_notification = f"Notification:{updated_order.id}:cancelled"
             try:
-                self.notification_client.send_notification(
+                await self.notification_client.send_notification(
                     message=message,
                     reference_id=updated_order.id,
                     idempotency_key=idempotency_key_notification,
                 )
             except NotificationServiceError:
-                print(
+                logger.warning(
                     "Notification service is unavailable. Message about cancelled order wasn't sent."
                 )
         else:
+            logger.warning("Unknown shipment event type: %s", event_type)
             return None
 
         return updated_order

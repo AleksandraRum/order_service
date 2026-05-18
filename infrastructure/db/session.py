@@ -1,11 +1,9 @@
-import os
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = os.environ["POSTGRES_CONNECTION_STRING"].replace(
-    "postgres://", "postgresql://"
-)
+from infrastructure.config import settings
+
+DATABASE_URL = settings.DATABASE_URL.replace("postgres://", "postgresql://")
 
 engine = create_engine(DATABASE_URL)
 

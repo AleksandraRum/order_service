@@ -1,10 +1,9 @@
-from dotenv import load_dotenv
-
-load_dotenv()
-
-import threading
+import asyncio
+import contextlib
+import logging
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from infrastructure.db.models import Base
@@ -12,19 +11,31 @@ from infrastructure.db.session import engine
 from infrastructure.kafka.consumer import run_consumer
 from presentation.api import router
 
+load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
 Base.metadata.create_all(bind=engine)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    thread = threading.Thread(target=run_consumer, daemon=True)
-    thread.start()
 
-    print("Kafka consumer started")
+    consumer_task = asyncio.create_task(run_consumer())
+    logger.info("Kafka consumer started")
 
-    yield
-
-    print("Application shutting down")
+    try:
+        yield
+    finally:
+        consumer_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await consumer_task
+        logger.info("Application shutting down")
 
 
 app = FastAPI(lifespan=lifespan)

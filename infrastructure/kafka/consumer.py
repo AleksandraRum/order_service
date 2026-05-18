@@ -1,39 +1,36 @@
-from confluent_kafka import Consumer
+import logging
+
+from aiokafka import AIOKafkaConsumer
 
 from infrastructure.config import settings
 from infrastructure.kafka.handler import handle_message
+from presentation.dependencies import get_notification_client
+
+logger = logging.getLogger(__name__)
 
 
-def run_consumer():
+async def run_consumer():
     bootstrap_servers = settings.KAFKA_BOOTSTRAP_SERVERS
     if not bootstrap_servers:
-        print("KAFKA_BOOTSTRAP_SERVERS is not set, consumer will not start", flush=True)
+        logger.warning("KAFKA_BOOTSTRAP_SERVERS is not set, consumer will not start")
         return
-    conf = {
-        "bootstrap.servers": bootstrap_servers,
-        "group.id": "order-service-group-v2",
-        "auto.offset.reset": "earliest",
-    }
 
-    consumer = Consumer(conf)
-    consumer.subscribe(["student_system-shipment.events"])
-    print("Kafka subscribed to student_system-shipment.events", flush=True)
+    consumer = AIOKafkaConsumer(
+        "student_system-shipment.events",
+        bootstrap_servers=bootstrap_servers,
+        group_id="order-service-group-v2",
+        auto_offset_reset="earliest",
+    )
 
-    print("Kafka consumer started", flush=True)
+    await consumer.start()
 
+    logger.info("Kafka subscribed to student_system-shipment.events")
+    notification_client = get_notification_client()
     try:
-        while True:
-            msg = consumer.poll(1.0)
+        async for msg in consumer:
+            logger.info("KAFKA MESSAGE RECEIVED: %s", msg.value)
 
-            if msg is None:
-                continue
-
-            if msg.error():
-                print("Kafka error:", msg.error(), flush=True)
-                continue
-
-            print("KAFKA MESSAGE RECEIVED:", msg.value(), flush=True)
-            handle_message(msg.value())
+            await handle_message(msg.value, notification_client=notification_client)
 
     finally:
-        consumer.close()
+        await consumer.stop()

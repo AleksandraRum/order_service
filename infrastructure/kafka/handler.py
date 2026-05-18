@@ -1,43 +1,40 @@
 import json
+import logging
 
 from pydantic import ValidationError
 
 from application.dto import ShipmentEventDTO
 from application.use_cases import ShipmentEventUseCase
-from infrastructure.clients import NotificationServiceClient
-from infrastructure.config import settings
 from infrastructure.db.session import SessionLocal
 from infrastructure.exceptions import OrderNotFoundError, UnknownTypeEvent
 from infrastructure.unit_of_work import UnitOfWork
 
+logger = logging.getLogger(__name__)
 
-def handle_message(raw_message):
+
+async def handle_message(raw_message, notification_client):
     try:
         data = json.loads(raw_message.decode("utf-8"))
         dto = ShipmentEventDTO(**data)
     except json.JSONDecodeError:
-        print("Invalid JSON:", raw_message)
+        logger.warning("Invalid JSON: %s", raw_message)
         return
     except ValidationError as e:
-        print("Invalid DTO:", e)
+        logger.warning("Invalid DTO: %s", e)
         return
 
     session = SessionLocal()
     try:
         uow = UnitOfWork(session)
-        notification_client = NotificationServiceClient(
-            base_url=settings.BASE_URL,
-            api_key=settings.API_KEY,
-        )
         use_case = ShipmentEventUseCase(
             uow=uow, notification_client=notification_client
         )
-        use_case(dto)
+        await use_case(dto)
     except OrderNotFoundError:
-        print(f"Order not found: {dto.order_id}")
+        logger.warning("Order not found: %s", dto.order_id)
     except UnknownTypeEvent:
-        print(f"Unknown event type: {dto.event_type}")
-    except Exception as e:
-        print("Unexpected error:", e)
+        logger.warning("Unknown event type: %s", dto.event_type)
+    except Exception:
+        logger.exception("Unexpected error while handling Kafka message")
     finally:
         session.close()
