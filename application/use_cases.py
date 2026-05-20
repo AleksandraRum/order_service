@@ -9,21 +9,22 @@ from application.dto import (
     ShipmentEventDTO,
     ShipmentEventTypeEnum,
 )
+from application.exceptions import (
+    NotificationServiceError,
+    PaymentServiceError,
+)
 from application.ports import (
     CatalogPort,
     NotificationPort,
     PaymentsPort,
     UnitOfWorkPort,
 )
-from domain.exceptions import PaymentCreationError
-from domain.models import Order, OrderStatusEnum
-from infrastructure.exceptions import (
+from domain.exceptions import (
     NotEnoughStockError,
-    NotificationServiceError,
     OrderNotFoundError,
-    PaymentServiceError,
+    PaymentCreationError,
 )
-from infrastructure.kafka.producer import send_event
+from domain.models import Order, OrderStatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +149,6 @@ class CallBackPaymentsUseCase:
                     event_type="order.paid",
                     payload=payload,
                 )
-
                 self.uow.commit()
                 message = "PAID: Ваш заказ успешно оплачен и готов к отправке"
                 idempotency_key_notification = f"Notification:{updated_order.id}:paid"
@@ -162,7 +162,6 @@ class CallBackPaymentsUseCase:
                     logger.warning(
                         "Notification service is unavailable. Message about payment wasn't sent."
                     )
-                await send_event("student_system-order.events", payload)
 
             elif dto.status == PaymentCallbackStatusEnum.FAILED:
                 updated_order = self.uow.orders.update_status(

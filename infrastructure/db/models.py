@@ -1,9 +1,11 @@
 import uuid
 from enum import StrEnum
 
-from sqlalchemy import JSON, Column, DateTime, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Column, DateTime, Enum, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
+
+from domain.models import OrderStatusEnum
 
 Base = declarative_base()
 
@@ -21,7 +23,7 @@ class OrderDB(Base):
     quantity = Column(Integer, nullable=False)
     item_id = Column(String, nullable=False)
     idempotency_key = Column(String, nullable=False, unique=True)
-    status = Column(String, nullable=False)
+    status = Column(Enum(OrderStatusEnum), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
@@ -31,7 +33,7 @@ class OutboxDB(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     event_type = Column(String, nullable=False)
     payload = Column(JSON, nullable=False)
-    status = Column(String, nullable=False)
+    status = Column(Enum(OutboxStatusEnum), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
 
 

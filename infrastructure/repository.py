@@ -4,9 +4,9 @@ from datetime import UTC, datetime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from domain.exceptions import OrderNotFoundError
 from domain.models import Order
 from infrastructure.db.models import InboxDB, OrderDB, OutboxDB, OutboxStatusEnum
-from infrastructure.exceptions import OrderNotFoundError
 
 
 class OrderRepository:
@@ -42,7 +42,7 @@ class OrderRepository:
             quantity=order.quantity,
             item_id=order.item_id,
             idempotency_key=order.idempotency_key,
-            status=order.status.value,
+            status=order.status,
             created_at=order.created_at,
             updated_at=order.updated_at,
         )
@@ -63,7 +63,7 @@ class OrderRepository:
             raise OrderNotFoundError("Order isn't found")
 
         now = datetime.now(UTC)
-        order_db.status = status.value
+        order_db.status = status
         order_db.updated_at = now
 
         return self._to_domain(order_db)
@@ -89,10 +89,22 @@ class OutboxRepository:
         event_outbox = OutboxDB(
             event_type=event_type,
             payload=payload,
-            status=OutboxStatusEnum.PENDING.value,
+            status=OutboxStatusEnum.PENDING,
             created_at=datetime.now(UTC),
         )
         self.session.add(event_outbox)
+
+    def get_pending(self, limit: int = 10):
+        return (
+            self.session.query(OutboxDB)
+            .filter(OutboxDB.status == OutboxStatusEnum.PENDING)
+            .order_by(OutboxDB.created_at)
+            .limit(limit)
+            .all()
+        )
+
+    def mark_as_sent(self, event):
+        event.status = OutboxStatusEnum.SENT
 
 
 class InboxRepository:

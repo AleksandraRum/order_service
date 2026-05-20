@@ -4,7 +4,7 @@ import pytest
 
 from application.dto import CreateOrderDTO
 from application.use_cases import CreateOrderUseCase
-from infrastructure.exceptions import NotEnoughStockError
+from domain.exceptions import NotEnoughStockError
 
 
 def test_create_order_returns_existing_order_when_idempotency_key_exists(order_factory):

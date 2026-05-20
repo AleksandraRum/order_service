@@ -13,7 +13,7 @@ async def get_producer():
     if not bootstrap:
         logger.error("Kafka not configured")
         return None
-    
+
     producer = AIOKafkaProducer(
         bootstrap_servers=bootstrap,
     )

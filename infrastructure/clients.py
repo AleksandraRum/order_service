@@ -4,12 +4,12 @@ from urllib.parse import urljoin
 
 import httpx
 
-from infrastructure.exceptions import (
+from application.exceptions import (
     CatalogServiceError,
-    ItemNotFoundError,
     NotificationServiceError,
     PaymentServiceError,
 )
+from domain.exceptions import ItemNotFoundError
 
 logger = logging.getLogger(__name__)
 

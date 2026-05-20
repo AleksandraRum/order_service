@@ -1,25 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from application.dto import CreateOrderDTO, PaymentCallbackDTO
+from application.exceptions import CatalogServiceError
 from application.use_cases import (
     CallBackPaymentsUseCase,
     CreateOrderUseCase,
     GetOrderUseCase,
 )
-from domain.exceptions import InvalidQuantityError, PaymentCreationError
-from infrastructure.config import settings
-from infrastructure.db.session import SessionLocal
-from infrastructure.exceptions import (
-    CatalogServiceError,
+from domain.exceptions import (
+    InvalidQuantityError,
     ItemNotFoundError,
     NotEnoughStockError,
     OrderNotFoundError,
+    PaymentCreationError,
 )
+from infrastructure.config import settings
+from infrastructure.db.session import SessionLocal
 from infrastructure.unit_of_work import UnitOfWork
 from presentation.dependencies import (
     get_catalog_client,
     get_notification_client,
     get_payments_client,
+    get_session,
 )
 from presentation.schemas.request import CreateOrderRequest, PaymentCallbackRequest
 from presentation.schemas.response import OrderResponse
@@ -28,9 +30,7 @@ router = APIRouter()
 
 
 @router.get("/api/orders/{order_id}", response_model=OrderResponse)
-def get_order(order_id: str):
-    session = SessionLocal()
-
+async def get_order(order_id: str, session=Depends(get_session)):
     try:
         uow = UnitOfWork(session)
         use_case = GetOrderUseCase(uow=uow)
@@ -47,9 +47,6 @@ def get_order(order_id: str):
         return response
     except OrderNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-    finally:
-        session.close()
 
 
 @router.post("/api/orders", response_model=OrderResponse, status_code=201)

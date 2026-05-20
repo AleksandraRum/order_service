@@ -5,8 +5,9 @@ from pydantic import ValidationError
 
 from application.dto import ShipmentEventDTO
 from application.use_cases import ShipmentEventUseCase
+from domain.exceptions import OrderNotFoundError
 from infrastructure.db.session import SessionLocal
-from infrastructure.exceptions import OrderNotFoundError, UnknownTypeEvent
+from infrastructure.exceptions import UnknownTypeEvent
 from infrastructure.unit_of_work import UnitOfWork
 
 logger = logging.getLogger(__name__)

@@ -4,6 +4,7 @@ from infrastructure.clients import (
     PaymentsClient,
 )
 from infrastructure.config import settings
+from infrastructure.db.session import SessionLocal
 
 
 def get_catalog_client():
@@ -25,3 +26,11 @@ def get_notification_client():
         base_url=settings.BASE_URL,
         api_key=settings.API_KEY,
     )
+
+
+def get_session():
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
